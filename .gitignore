@@ -1,0 +1,22 @@
+# Dataset (too large for git — download and place separately)
+data/*
+!data/chest_xray/.gitkeep
+
+# Trained model weights (large binaries)
+models/*.keras
+models/*.h5
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.ipynb_checkpoints/
+
+# Environments
+venv/
+env/
+.venv/
+
+# OS
+.DS_Store
+Thumbs.db
