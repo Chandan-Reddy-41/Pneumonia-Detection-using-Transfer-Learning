@@ -1,4 +1,4 @@
-tensorflow>=2.15,<2.20
+tensorflow
 numpy
 matplotlib
 scikit-learn

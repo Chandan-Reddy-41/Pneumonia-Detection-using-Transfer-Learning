@@ -1,22 +1,43 @@
-# Dataset (too large for git — download and place separately)
+# ==========================
+# Dataset
+# ==========================
 data/*
-!data/chest_xray/.gitkeep
+!data/.gitkeep
 
-# Trained model weights (large binaries)
-models/*.keras
-models/*.h5
+# ==========================
+# Trained Models
+# ==========================
+models/*
+!models/.gitkeep
 
+
+# ==========================
 # Python
+# ==========================
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
 .ipynb_checkpoints/
 
-# Environments
+# ==========================
+# Virtual Environments
+# ==========================
 venv/
-env/
 .venv/
+env/
 
-# OS
+# ==========================
+# IDE
+# ==========================
+.vscode/
+.idea/
+
+# ==========================
+# Operating System
+# ==========================
 .DS_Store
 Thumbs.db
+
+# ==========================
+# Logs
+# ==========================
+*.log

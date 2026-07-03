@@ -1,6 +1,7 @@
-"""
-Phase 3: Baseline CNN (from scratch)
-Phase 4: Transfer Learning (MobileNetV2)
+"""Phase 3 and 4: Model definitions.
+
+Contains baseline CNN and MobileNetV2 transfer model builders used by the
+training and evaluation scripts.
 """
 import tensorflow as tf
 from tensorflow.keras import layers, models
@@ -8,8 +9,18 @@ from tensorflow.keras import layers, models
 from src import config
 
 
-def build_baseline_cnn(input_shape=config.INPUT_SHAPE):
-    """A compact custom CNN: 4 conv blocks + dense classification head."""
+def build_baseline_cnn(input_shape=config.BASELINE_INPUT_SHAPE):
+    """Build a compact CNN for training from scratch.
+
+    Architecture: 4 convolutional blocks with batch normalization and
+    max-pooling, followed by global average pooling and a small dense head.
+
+    Args:
+        input_shape: Tuple describing input image shape, e.g. (150, 150, 3).
+
+    Returns:
+        An uncompiled `tf.keras.Model`.
+    """
     model = models.Sequential(
         [
             layers.Input(shape=input_shape),
@@ -40,26 +51,24 @@ def build_baseline_cnn(input_shape=config.INPUT_SHAPE):
     return model
 
 
-def build_transfer_model(input_shape=config.INPUT_SHAPE, fine_tune_at=None):
-    """
-    MobileNetV2 backbone (ImageNet weights) + custom classification head.
-    Chosen for being lightweight enough to fine-tune on CPU.
+def build_transfer_model(input_shape=config.TRANSFER_INPUT_SHAPE):
+    """Build a MobileNetV2-based model with a custom classification head.
 
-    fine_tune_at: if set (e.g. 100), unfreezes layers from this index onward
-                  for a second fine-tuning pass. Leave None to keep the
-                  backbone fully frozen (feature-extraction only).
+    The MobileNetV2 backbone is loaded with ImageNet weights and frozen by default.
+    The returned tuple is `(model, base_model)` where `base_model` refers to the
+    MobileNetV2 instance; this allows selective unfreezing for a second
+    fine-tuning pass.
 
-    Note: expects raw images in [0, 255] -- MobileNetV2's own preprocessing
-    is applied inside the model, so use prepare_dataset(..., rescale=False)
-    for this model.
+    Args:
+        input_shape: Model input shape, typically `config.TRANSFER_INPUT_SHAPE`.
+
+    Returns:
+        (model, base_model)
     """
     base_model = tf.keras.applications.MobileNetV2(
         input_shape=input_shape, include_top=False, weights="imagenet"
     )
-    base_model.trainable = fine_tune_at is not None
-    if fine_tune_at is not None:
-        for layer in base_model.layers[:fine_tune_at]:
-            layer.trainable = False
+    base_model.trainable = False
 
     inputs = tf.keras.Input(shape=input_shape)
     x = tf.keras.applications.mobilenet_v2.preprocess_input(inputs)
@@ -74,11 +83,32 @@ def build_transfer_model(input_shape=config.INPUT_SHAPE, fine_tune_at=None):
     return model, base_model
 
 
-def compile_model(model, lr=1e-4):
-    """Binary crossentropy + Adam, tracking accuracy/precision/recall/AUC.
+def unfreeze_for_finetuning(base_model, fine_tune_at=100):
+    """Unfreeze a suffix of the backbone for fine-tuning.
 
-    Recall is tracked explicitly because in a diagnostic setting a missed
-    pneumonia case (false negative) is costlier than a false alarm.
+    Args:
+        base_model: The pretrained backbone model (MobileNetV2 instance).
+        fine_tune_at: Integer layer index from which layers will be set to
+            trainable; layers before this index remain frozen.
+
+    Returns:
+        The modified `base_model` with updated `.trainable` flags.
+    """
+    base_model.trainable = True
+    for layer in base_model.layers[:fine_tune_at]:
+        layer.trainable = False
+    return base_model
+
+
+def compile_model(model, lr=1e-4):
+    """Compile model with Adam optimizer and diagnostic-focused metrics.
+
+    Args:
+        model: Uncompiled Keras model.
+        lr: Learning rate for the Adam optimizer.
+
+    Returns:
+        The compiled model (same object passed in).
     """
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=lr),

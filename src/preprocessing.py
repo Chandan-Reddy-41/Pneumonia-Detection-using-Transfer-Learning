@@ -1,9 +1,8 @@
-"""
-Phase 2: Preprocessing & Augmentation
+"""Phase 2: Preprocessing & Augmentation.
 
 - Normalizes pixel values
 - Applies augmentation to the training set only
-  (no vertical flip -- would produce an anatomically invalid X-ray)
+    (no vertical flip -- would produce an anatomically invalid X-ray)
 - Computes class weights to counter the NORMAL/PNEUMONIA imbalance
 - Builds efficient tf.data pipelines (cache + prefetch)
 """
@@ -28,13 +27,16 @@ data_augmentation = tf.keras.Sequential(
 
 
 def prepare_dataset(ds, training=False, rescale=True):
-    """
-    Apply normalization, (optionally) augmentation, and performance tuning
-    to a raw tf.data.Dataset from image_dataset_from_directory.
+    """Prepare a tf.data.Dataset by normalizing, augmenting and optimizing.
 
-    Set rescale=False when the model itself has a preprocessing layer
-    baked in (e.g. tf.keras.applications.mobilenet_v2.preprocess_input),
-    to avoid double-normalizing.
+    Args:
+        ds: Raw dataset from `image_dataset_from_directory` yielding (image, label).
+        training: If True, apply augmentation and shuffling.
+        rescale: If True, scale images to [0, 1]. Set False for models that
+            include their own preprocessing layer (e.g., MobileNetV2).
+
+    Returns:
+        A tf.data.Dataset optimized with `cache()` and `prefetch()`.
     """
     if rescale:
         ds = ds.map(lambda x, y: (x / 255.0, y), num_parallel_calls=AUTOTUNE)
@@ -47,9 +49,10 @@ def prepare_dataset(ds, training=False, rescale=True):
 
 
 def get_class_weights():
-    """
-    Compute balanced class weights from the training set folder counts.
-    Returns a dict like {0: weight_for_NORMAL, 1: weight_for_PNEUMONIA}.
+    """Compute balanced class weights from counts in `config.TRAIN_DIR`.
+
+    Returns a dict mapping integer class index to weight suitable for
+    passing as `class_weight` to `model.fit()`.
     """
     counts = count_images(config.TRAIN_DIR)
     labels = np.concatenate(

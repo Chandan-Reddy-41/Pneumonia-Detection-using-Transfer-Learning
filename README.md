@@ -81,6 +81,7 @@ pneumonia-detection/
 │   └── gradcam.py            # Phase 6: Grad-CAM implementation
 ├── main.py                  # runs Phases 1-5 end to end
 ├── gradcam_demo.py           # runs Phase 6 (after main.py)
+├── prepare_data_split.py     # run once before main.py -- fixes the tiny val set
 ├── requirements.txt
 └── README.md
 ```
@@ -101,11 +102,19 @@ pip install -r requirements.txt
 
 # 4. Download the dataset and unzip into data/chest_xray/
 #    (should produce data/chest_xray/train, /val, /test)
+
+# 5. Fix the validation split (the original val/ folder has only 16 images --
+#    too few for EarlyStopping to get a meaningful signal). This merges it
+#    into train/ so a proper stratified split can be carved out at load time.
+python prepare_data_split.py
 ```
 
 ## Usage
 
 ```bash
+# One-time: fix the validation split (skip if you already ran it during setup)
+python prepare_data_split.py
+
 # Run the full pipeline: EDA -> preprocessing -> both models -> evaluation
 python main.py
 
@@ -128,7 +137,53 @@ recall, via `ModelCheckpoint`).
 | Model | Accuracy | Precision (Pneumonia) | Recall (Pneumonia) | F1 (Pneumonia) | ROC-AUC |
 |---|---|---|---|---|---|
 | Baseline CNN | — | — | — | — | — |
-| Transfer Learning (MobileNetV2) | — | — | — | — | — |
+| Transfer Learning (MobileNetV2, fine-tuned) | — | — | — | — | — |
+
+### v1 run (for reference — see Changelog below for what was fixed)
+
+| Model | Accuracy | Precision (Pneumonia) | Recall (Pneumonia) | F1 (Pneumonia) | ROC-AUC |
+|---|---|---|---|---|---|
+| Baseline CNN | 0.375 | 0.00 | 0.00 | 0.00 | 0.605 |
+| Transfer Learning (MobileNetV2) | 0.756 | 0.73 | 0.96 | 0.83 | 0.889 |
+
+## Changelog
+
+**v3** — fixes based on analyzing the v2 run:
+- **Baseline CNN learning rate raised from 1e-4 to 1e-3.** In v2 the
+  baseline's train accuracy sat flat at ~50% for all 9 epochs -- the
+  validation-split fix solved the *measurement* problem, but the model
+  still wasn't learning. 1e-4 is an appropriate fine-tuning rate for the
+  pretrained transfer model, but too conservative to move a randomly
+  initialized network within a handful of epochs.
+- **Threshold-tuned metrics now land in `model_comparison.csv` as their own
+  row**, with their own confusion matrix (`cm_transfer_tuned.png`), instead
+  of only being printed to console and easy to lose. v2's transfer model
+  hit AUC=0.943 but collapsed to predicting PNEUMONIA for almost every
+  image at the default 0.5 threshold (206/234 NORMAL images misclassified)
+  -- the precision-recall curve showed a much better operating point was
+  available, this just makes it visible in the saved results.
+
+**v2** — fixes based on analyzing the v1 run:
+- **Fixed the validation set.** The original Kaggle `val/` folder has only
+  16 images, which gave `EarlyStopping`/`ModelCheckpoint` a flat,
+  near-meaningless signal (val_recall stuck at exactly 0.0). This is what
+  caused the v1 baseline CNN to collapse to predicting NORMAL for every
+  image (37.5% accuracy = exactly the NORMAL class proportion). `val/` is
+  now merged into `train/` (`prepare_data_split.py`) and a proper
+  stratified split is carved out via `validation_split` at load time.
+- **Baseline CNN now monitors `val_loss` instead of `val_recall`** for
+  early stopping (patience 8, up from 5) — a smoother signal for a model
+  training from random initialization.
+- **Transfer learning now uses 224×224 input** (`config.TRANSFER_IMG_SIZE`),
+  matching the resolution MobileNetV2 was pretrained at. v1 used 150×150,
+  a resolution mismatch that likely cost feature quality.
+- **Added a fine-tuning pass** (`models.unfreeze_for_finetuning`) — after
+  initial frozen-backbone training, the top layers of MobileNetV2 unfreeze
+  for a second pass at a much lower learning rate (1e-5).
+- **Added threshold tuning** (`evaluate.find_best_threshold`,
+  `plot_precision_recall_curve`) — the default 0.5 decision threshold is
+  rarely optimal; this sweeps thresholds to maximize F1 while keeping
+  recall on PNEUMONIA at or above 90%.
 
 ## Explainability
 
