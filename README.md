@@ -1,8 +1,6 @@
-# Pneumonia Detection from Chest X-Rays
+# Pneumonia-Detection-using-Transfer-Learning
 
-A CNN-based image classifier that detects pneumonia from pediatric chest X-ray
-images, comparing a custom-built CNN against a MobileNetV2 transfer-learning
-model, with Grad-CAM explainability to visualize model decisions.
+A deep learning project for detecting pediatric pneumonia from chest X-ray images using Convolutional Neural Networks (CNNs) and MobileNetV2 Transfer Learning. The project compares a custom CNN with a fine-tuned MobileNetV2 model and uses Grad-CAM to visualize the regions influencing model predictions.
 
 ## Problem Statement
 
@@ -14,6 +12,17 @@ interpretable enough to trust.
 Because a missed pneumonia case (false negative) is more costly than a false
 alarm, **recall on the PNEUMONIA class** is treated as the primary metric
 alongside accuracy, not accuracy alone.
+
+## Project Highlights
+
+- Deep Learning-based medical image classification
+- Baseline CNN and MobileNetV2 Transfer Learning
+- Fine-tuning for improved performance
+- Data augmentation and preprocessing
+- Threshold optimization for better recall
+- Grad-CAM Explainable AI
+- ROC Curve, Precision-Recall Curve, Confusion Matrix
+- Modular Python project structure
 
 ## Dataset
 
@@ -83,7 +92,8 @@ pneumonia-detection/
 ├── gradcam_demo.py           # runs Phase 6 (after main.py)
 ├── prepare_data_split.py     # run once before main.py -- fixes the tiny val set
 ├── requirements.txt
-└── README.md
+├── README.md
+└── setup.cfg
 ```
 
 ## Setup
@@ -131,59 +141,25 @@ recall, via `ModelCheckpoint`).
 
 ## Results
 
-*(Fill in after running `main.py` on your machine — copy values from
-`results/model_comparison.csv`.)*
+The final fine-tuned MobileNetV2 model with threshold optimization achieved the following performance on the test set.
 
-| Model | Accuracy | Precision (Pneumonia) | Recall (Pneumonia) | F1 (Pneumonia) | ROC-AUC |
-|---|---|---|---|---|---|
-| Baseline CNN | — | — | — | — | — |
-| Transfer Learning (MobileNetV2, fine-tuned) | — | — | — | — | — |
+| Model | Accuracy | Precision | Recall | F1-Score | ROC-AUC |
+|-------|---------:|----------:|--------:|---------:|---------:|
+| Baseline CNN | **59.62%** | **62.02%** | **91.28%** | **73.86%** | **0.570** |
+| MobileNetV2 (Fine-tuned) | **71.79%** | **68.90%** | **100.00%** | **81.59%** | **0.956** |
+| **MobileNetV2 + Threshold Optimization** | **90.22%** | **91.44%** | **93.08%** | **92.25%** | **0.956** |
 
-### v1 run (for reference — see Changelog below for what was fixed)
+### ROC Curve
 
-| Model | Accuracy | Precision (Pneumonia) | Recall (Pneumonia) | F1 (Pneumonia) | ROC-AUC |
-|---|---|---|---|---|---|
-| Baseline CNN | 0.375 | 0.00 | 0.00 | 0.00 | 0.605 |
-| Transfer Learning (MobileNetV2) | 0.756 | 0.73 | 0.96 | 0.83 | 0.889 |
+![ROC Curve](results/roc_comparison.png)
 
-## Changelog
+### Confusion Matrix
 
-**v3** — fixes based on analyzing the v2 run:
-- **Baseline CNN learning rate raised from 1e-4 to 1e-3.** In v2 the
-  baseline's train accuracy sat flat at ~50% for all 9 epochs -- the
-  validation-split fix solved the *measurement* problem, but the model
-  still wasn't learning. 1e-4 is an appropriate fine-tuning rate for the
-  pretrained transfer model, but too conservative to move a randomly
-  initialized network within a handful of epochs.
-- **Threshold-tuned metrics now land in `model_comparison.csv` as their own
-  row**, with their own confusion matrix (`cm_transfer_tuned.png`), instead
-  of only being printed to console and easy to lose. v2's transfer model
-  hit AUC=0.943 but collapsed to predicting PNEUMONIA for almost every
-  image at the default 0.5 threshold (206/234 NORMAL images misclassified)
-  -- the precision-recall curve showed a much better operating point was
-  available, this just makes it visible in the saved results.
+![Confusion Matrix](results/cm_transfer_tuned.png)
 
-**v2** — fixes based on analyzing the v1 run:
-- **Fixed the validation set.** The original Kaggle `val/` folder has only
-  16 images, which gave `EarlyStopping`/`ModelCheckpoint` a flat,
-  near-meaningless signal (val_recall stuck at exactly 0.0). This is what
-  caused the v1 baseline CNN to collapse to predicting NORMAL for every
-  image (37.5% accuracy = exactly the NORMAL class proportion). `val/` is
-  now merged into `train/` (`prepare_data_split.py`) and a proper
-  stratified split is carved out via `validation_split` at load time.
-- **Baseline CNN now monitors `val_loss` instead of `val_recall`** for
-  early stopping (patience 8, up from 5) — a smoother signal for a model
-  training from random initialization.
-- **Transfer learning now uses 224×224 input** (`config.TRANSFER_IMG_SIZE`),
-  matching the resolution MobileNetV2 was pretrained at. v1 used 150×150,
-  a resolution mismatch that likely cost feature quality.
-- **Added a fine-tuning pass** (`models.unfreeze_for_finetuning`) — after
-  initial frozen-backbone training, the top layers of MobileNetV2 unfreeze
-  for a second pass at a much lower learning rate (1e-5).
-- **Added threshold tuning** (`evaluate.find_best_threshold`,
-  `plot_precision_recall_curve`) — the default 0.5 decision threshold is
-  rarely optimal; this sweeps thresholds to maximize F1 while keeping
-  recall on PNEUMONIA at or above 90%.
+### Grad-CAM Visualization
+
+![Grad-CAM](results/gradcam_sample.png)
 
 ## Explainability
 
@@ -194,7 +170,13 @@ artifacts (text markers, equipment edges, etc.).
 
 ## Tech Stack
 
-Python, TensorFlow/Keras, scikit-learn, pandas, matplotlib
+- Python
+- TensorFlow / Keras
+- OpenCV
+- NumPy
+- Pandas
+- Matplotlib
+- scikit-learn
 
 ## Author
 
